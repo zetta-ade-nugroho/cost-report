@@ -38,7 +38,7 @@ with st.sidebar.expander("File Paths", expanded=False):
     )
     astradb_path = st.text_input(
         "AstraDB CSV Path", 
-        value="astradb_usage.csv",
+        value="report-2025_05_29.csv",
         help="Path to your AstraDB usage CSV file"
     )
 
