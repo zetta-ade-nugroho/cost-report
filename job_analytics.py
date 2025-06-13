@@ -7,6 +7,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import re
 import pycountry
+import ast
 
 # Page configuration
 st.set_page_config(
@@ -153,6 +154,10 @@ def get_iso3(country_name):
 # ------------------------------
 # 📊 Location-Based Analysis
 # ------------------------------
+
+# ------------------------------
+# 🌍 Location Analysis Function
+# ------------------------------
 def show_location_analysis(df):
     """Display location-based insights including pie charts and a choropleth map."""
     st.subheader("🌍 Location Analysis")
@@ -200,35 +205,77 @@ def show_location_analysis(df):
 
     # Plot choropleth map
     fig_map = px.choropleth(
-    country_counts,
-    locations="iso_alpha",
-    locationmode="ISO-3",
-    color="count",
-    hover_name="country",
-    color_continuous_scale="Turbo",  # ← CHANGE THIS FOR STRONGER COLORS
-    title="📍 Jobs by Country (ISO Choropleth)",
-)
+        country_counts,
+        locations="iso_alpha",
+        locationmode="ISO-3",
+        color="count",
+        hover_name="country",
+        color_continuous_scale="Turbo",
+        title="📍 Jobs by Country (ISO Choropleth)"
+    )
 
     fig_map.update_geos(
-    showframe=False,
-    showcoastlines=True,
-    projection_type='natural earth',
-    showland=True,
-    landcolor='White',     # better contrast with colored countries
-    oceancolor='LightBlue',
-)
+        showframe=False,
+        showcoastlines=True,
+        projection_type='natural earth',
+        showland=True,
+        landcolor='White',
+        oceancolor='LightBlue',
+    )
 
     fig_map.update_layout(
-    margin={"r": 0, "t": 40, "l": 0, "b": 0},
-    coloraxis_colorbar={
-        'title': 'Job Count',
-        'tickprefix': '',
-        'ticksuffix': ' jobs',
-    }
-)
+        margin={"r": 0, "t": 40, "l": 0, "b": 0},
+        coloraxis_colorbar={
+            'title': 'Job Count',
+            'tickprefix': '',
+            'ticksuffix': ' jobs',
+        }
+    )
 
     st.plotly_chart(fig_map, use_container_width=True)
 
+    # ------------------------------
+    # 📍 Step 4: GPS-Based Scatter Map
+    # ------------------------------
+    st.subheader("📌 Exact Location Map (GPS Points)")
+
+    def extract_valid_coords(row):
+        job_id = row.name
+        try:
+            coords_list = ast.literal_eval(row['location_detail'])
+            valid_coords = [c for c in coords_list if c and None not in c]
+            return [(job_id, c[0], c[1], row.get('location', None), row.get('country', None)) for c in valid_coords]
+        except:
+            return []
+
+    # Flatten coordinates into a new DataFrame
+    all_coords = []
+    for _, row in df.iterrows():
+        all_coords.extend(extract_valid_coords(row))
+
+    if all_coords:
+        geo_df = pd.DataFrame(all_coords, columns=['job_id', 'latitude', 'longitude', 'location', 'country'])
+
+        fig_gps = px.scatter_mapbox(
+            geo_df,
+            lat="latitude",
+            lon="longitude",
+            hover_name="location",
+            hover_data=["country"],
+            zoom=1,
+            height=600,
+            color_discrete_sequence=["#636EFA"]
+        )
+
+        fig_gps.update_layout(
+            mapbox_style="open-street-map",
+            title="📍 Jobs with Precise GPS (Mapbox)",
+            margin={"r": 0, "t": 50, "l": 0, "b": 0}
+        )
+
+        st.plotly_chart(fig_gps, use_container_width=True)
+    else:
+        st.info("No valid GPS coordinates found in `location_detail`.")
 
 def show_company_analysis(df):
     """Show company-based analysis"""
