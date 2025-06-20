@@ -726,6 +726,7 @@ def show_job_type_analysis(df):
     with col1:
         if 'job_type' in df.columns:
             job_type_dist = df['job_type'].value_counts()
+            job_type_dist = df['job_type'].value_counts().head(5)
             fig = px.pie(values=job_type_dist.values, names=job_type_dist.index,
                         title="Job Type Distribution")
             st.plotly_chart(fig, use_container_width=True)
@@ -733,6 +734,7 @@ def show_job_type_analysis(df):
     with col2:
         if 'job_contract' in df.columns:
             contract_dist = df['job_contract'].value_counts()
+            contract_dist = df['job_contract'].value_counts().head(5)
             fig = px.pie(values=contract_dist.values, names=contract_dist.index,
                         title="Contract Type Distribution")
             st.plotly_chart(fig, use_container_width=True)
