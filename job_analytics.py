@@ -24,21 +24,39 @@ def clean_salary_data(df):
         def extract_salary_range(salary_str):
             if pd.isna(salary_str) or salary_str == '':
                 return None, None
+# def clean_salary_data(df):
+#     """Clean and extract salary information"""
+#     if 'job_salary' in df.columns:
+#         # Extract numeric values from salary strings
+#         def extract_salary_range(salary_str):
+#             if pd.isna(salary_str) or salary_str == '':
+#                 return None, None
             
             # Remove common currency symbols and text
             clean_str = str(salary_str).replace('$', '').replace(',', '').replace('K', '000').replace('k', '000')
             numbers = re.findall(r'\d+', clean_str)
+#             # Remove common currency symbols and text
+#             clean_str = str(salary_str).replace('$', '').replace(',', '').replace('K', '000').replace('k', '000')
+#             numbers = re.findall(r'\d+', clean_str)
             
             if len(numbers) >= 2:
                 return int(numbers[0]), int(numbers[1])
             elif len(numbers) == 1:
                 return int(numbers[0]), int(numbers[0])
             return None, None
+#             if len(numbers) >= 2:
+#                 return int(numbers[0]), int(numbers[1])
+#             elif len(numbers) == 1:
+#                 return int(numbers[0]), int(numbers[0])
+#             return None, None
         
         df['salary_min'], df['salary_max'] = zip(*df['job_salary'].apply(extract_salary_range))
         df['salary_avg'] = df[['salary_min', 'salary_max']].mean(axis=1)
+#         df['salary_min'], df['salary_max'] = zip(*df['job_salary'].apply(extract_salary_range))
+#         df['salary_avg'] = df[['salary_min', 'salary_max']].mean(axis=1)
     
     return df
+#     return df
 
 def load_and_process_data(uploaded_file):
     """Load and process the CSV data"""
@@ -56,6 +74,8 @@ def load_and_process_data(uploaded_file):
         
         # Clean salary data
         df = clean_salary_data(df)
+        # # Clean salary data
+        # df = clean_salary_data(df)
         
         # Clean company size data
         if 'company_size' in df.columns:
@@ -113,6 +133,12 @@ def show_overview_metrics(df):
             st.metric("Avg Salary", f"${avg_salary:,.0f}")
         else:
             st.metric("Avg Salary", "N/A")
+    # with col5:
+    #     avg_salary = df['salary_avg'].mean() if 'salary_avg' in df.columns else 0
+    #     if avg_salary > 0:
+    #         st.metric("Avg Salary", f"${avg_salary:,.0f}")
+    #     else:
+    #         st.metric("Avg Salary", "N/A")
 
 def show_job_trends(df):
     """Show job posting trends over time"""
@@ -198,22 +224,32 @@ def show_location_analysis(df):
     st.subheader("🗺️ Global Job Distribution")
 
     # Prepare country distribution data with ISO mapping
+    # Step 1: Prepare the data
     country_counts = df['country'].value_counts().reset_index()
     country_counts.columns = ['country', 'count']
     country_counts['iso_alpha'] = country_counts['country'].apply(get_iso3)
     country_counts = country_counts.dropna(subset=['iso_alpha'])
 
-    # Plot choropleth map
+    # Step 2: Log-transform the job counts for coloring
+    country_counts['log_count'] = country_counts['count'].apply(lambda x: np.log1p(x))  # log(1 + x)
+
+    # Step 3: Create the choropleth
     fig_map = px.choropleth(
         country_counts,
         locations="iso_alpha",
         locationmode="ISO-3",
-        color="count",
+        color="log_count",  # Use log-transformed value for coloring
         hover_name="country",
-        color_continuous_scale="Turbo",
-        title="📍 Jobs by Country (ISO Choropleth)"
+        hover_data={
+            "count": True,        # Show actual job count
+            "log_count": False,   # Hide log-transformed value from hover
+            "iso_alpha": False    # Hide ISO code
+        },
+        color_continuous_scale="YlOrRd",  # Or "Blues", "OrRd", etc.
+        title="📍 Jobs by Country (Log Scaled Color)"
     )
 
+    # Step 4: Customize the map style
     fig_map.update_geos(
         showframe=False,
         showcoastlines=True,
@@ -223,15 +259,19 @@ def show_location_analysis(df):
         oceancolor='LightBlue',
     )
 
+    # Step 5: Show actual count in color bar
+    # Add tickvals/ticktext if you want fixed steps too
     fig_map.update_layout(
         margin={"r": 0, "t": 40, "l": 0, "b": 0},
         coloraxis_colorbar={
-            'title': 'Job Count',
-            'tickprefix': '',
-            'ticksuffix': ' jobs',
+            'title': 'Job Count (log-scaled color)',
+            'tickvals': [np.log1p(x) for x in [1, 10, 100, 1000, 10000]],
+            'ticktext': ['1', '10', '100', '1,000', '10,000'],
+            'ticksuffix': ' jobs'
         }
     )
 
+    # Step 6: Display in Streamlit
     st.plotly_chart(fig_map, use_container_width=True)
 
     # ------------------------------
@@ -347,6 +387,52 @@ def show_skills_analysis(df):
             from collections import Counter
             skill_counts = Counter(all_skills)
             top_skills = dict(skill_counts.most_common(20))
+# def show_salary_analysis(df):
+#     """Show salary analysis"""
+#     st.subheader("💰 Salary Analysis")
+    
+#     if 'salary_avg' in df.columns and not df['salary_avg'].isna().all():
+#         col1, col2 = st.columns(2)
+        
+#         with col1:
+#             # Salary distribution
+#             salary_data = df[df['salary_avg'].notna() & (df['salary_avg'] > 0)]
+#             if len(salary_data) > 0:
+#                 fig = px.histogram(salary_data, x='salary_avg', nbins=30,
+#                                  title="Salary Distribution",
+#                                  labels={'salary_avg': 'Average Salary ($)', 'count': 'Number of Jobs'})
+#                 st.plotly_chart(fig, use_container_width=True)
+        
+#         with col2:
+#             # Salary by job role
+#             if 'job_role' in df.columns:
+#                 salary_by_role = df[df['salary_avg'].notna() & (df['salary_avg'] > 0)].groupby('job_role')['salary_avg'].mean().sort_values(ascending=False).head(10)
+#                 if len(salary_by_role) > 0:
+#                     fig = px.bar(x=salary_by_role.values, y=salary_by_role.index,
+#                                orientation='h', title="Average Salary by Job Role (Top 10)",
+#                                labels={'x': 'Average Salary ($)', 'y': 'Job Role'})
+#                     fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+#                     st.plotly_chart(fig, use_container_width=True)
+#     else:
+#         st.info("No salary data available for analysis")
+
+# def show_skills_analysis(df):
+#     """Show skills analysis"""
+#     st.subheader("🛠️ Skills Analysis")
+    
+#     if 'skills_needed' in df.columns:
+#         # Extract and count skills
+#         all_skills = []
+#         for skills_str in df['skills_needed'].dropna():
+#             if isinstance(skills_str, str):
+#                 # Split by common delimiters
+#                 skills = re.split(r'[,;|\n]', skills_str)
+#                 all_skills.extend([skill.strip().lower() for skill in skills if skill.strip()])
+        
+#         if all_skills:
+#             from collections import Counter
+#             skill_counts = Counter(all_skills)
+#             top_skills = dict(skill_counts.most_common(20))
             
             fig = px.bar(x=list(top_skills.values()), y=list(top_skills.keys()),
                         orientation='h', title="Top 20 Required Skills",
@@ -357,6 +443,15 @@ def show_skills_analysis(df):
             st.info("No skills data available for analysis")
     else:
         st.info("Skills column not found in the dataset")
+#             fig = px.bar(x=list(top_skills.values()), y=list(top_skills.keys()),
+#                         orientation='h', title="Top 20 Required Skills",
+#                         labels={'x': 'Frequency', 'y': 'Skill'})
+#             fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+#             st.plotly_chart(fig, use_container_width=True)
+#         else:
+#             st.info("No skills data available for analysis")
+#     else:
+#         st.info("Skills column not found in the dataset")
 
 def show_source_comparison(df):
     """Show comprehensive job source comparison analysis"""
@@ -455,6 +550,23 @@ def show_source_comparison(df):
                 skills_info_pct = (has_skills / len(source_df) * 100) if len(source_df) > 0 else 0
             except (TypeError, ValueError):
                 skills_info_pct = 0
+        # # Safe calculation for salary info percentage
+        # salary_info_pct = 0
+        # if 'job_salary' in df.columns:
+        #     try:
+        #         has_salary = (~source_df['job_salary'].isna()).sum()
+        #         salary_info_pct = (has_salary / len(source_df) * 100) if len(source_df) > 0 else 0
+        #     except (TypeError, ValueError):
+        #         salary_info_pct = 0
+        
+        # # Safe calculation for skills info percentage
+        # skills_info_pct = 0
+        # if 'skills_needed' in df.columns:
+        #     try:
+        #         has_skills = (~source_df['skills_needed'].isna()).sum()
+        #         skills_info_pct = (has_skills / len(source_df) * 100) if len(source_df) > 0 else 0
+        #     except (TypeError, ValueError):
+        #         skills_info_pct = 0
         
         # Safe calculation for average salary
         avg_salary = None
@@ -484,6 +596,8 @@ def show_source_comparison(df):
             'Remote Jobs %': round(remote_pct, 1),
             'Has Salary Info %': round(salary_info_pct, 1),
             'Has Skills Info %': round(skills_info_pct, 1),
+            # 'Has Salary Info %': round(salary_info_pct, 1),
+            # 'Has Skills Info %': round(skills_info_pct, 1),
             'Avg Salary': avg_salary
         }
         source_metrics.append(metrics)
@@ -580,12 +694,28 @@ def show_source_comparison(df):
                         'Source': source,
                         'Salary': salary
                     } for salary in source_df['salary_avg'].tolist()])
+        # # Salary comparison by source
+        # if 'salary_avg' in df.columns:
+        #     st.markdown("#### 💰 Salary Comparison by Source")
+        #     salary_comparison = []
+        #     for source in selected_sources:
+        #         source_df = df[(df['source'] == source) & (df['salary_avg'].notna()) & (df['salary_avg'] > 0)]
+        #         if len(source_df) > 0:
+        #             salary_comparison.extend([{
+        #                 'Source': source,
+        #                 'Salary': salary
+        #             } for salary in source_df['salary_avg'].tolist()])
             
             if salary_comparison:
                 salary_comp_df = pd.DataFrame(salary_comparison)
                 fig = px.box(salary_comp_df, x='Source', y='Salary',
                            title="Salary Distribution by Source")
                 st.plotly_chart(fig, use_container_width=True)
+        #     if salary_comparison:
+        #         salary_comp_df = pd.DataFrame(salary_comparison)
+        #         fig = px.box(salary_comp_df, x='Source', y='Salary',
+        #                    title="Salary Distribution by Source")
+        #         st.plotly_chart(fig, use_container_width=True)
 
 def show_job_type_analysis(df):
     """Show job type and contract analysis"""
@@ -712,9 +842,8 @@ def main():
         show_overview_metrics(df)
         
         # Navigation tabs
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-            "📈 Trends", "🔄 Source Comparison", "🌍 Locations", "🏢 Companies", 
-            "💰 Salaries", "🛠️ Skills", "📋 Job Types", "🔍 Data Quality"
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "📈 Trends", "🔄 Source Comparison", "🌍 Locations", "🏢 Companies", "📋 Job Types", "🔍 Data Quality"
         ])
         
         with tab1:
@@ -729,16 +858,16 @@ def main():
         with tab4:
             show_company_analysis(df)
         
+        # with tab5:
+        #     show_salary_analysis(df)
+        
+        # with tab6:
+        #     show_skills_analysis(df)
+        
         with tab5:
-            show_salary_analysis(df)
-        
-        with tab6:
-            show_skills_analysis(df)
-        
-        with tab7:
             show_job_type_analysis(df)
         
-        with tab8:
+        with tab6:
             show_data_quality_report(df)
         
         # Raw data view
